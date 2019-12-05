@@ -14,16 +14,14 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // Fill baud box
     ui->baudBox->clear();
-    ui->baudBox->addItem(QStringLiteral("1200"), QSerialPort::Baud1200);
-    ui->baudBox->addItem(QStringLiteral("2400"), QSerialPort::Baud2400);
-    ui->baudBox->addItem(QStringLiteral("4800"), QSerialPort::Baud4800);
-    ui->baudBox->addItem(QStringLiteral("9600"), QSerialPort::Baud9600);
-    ui->baudBox->addItem(QStringLiteral("19200"), QSerialPort::Baud19200);
-    ui->baudBox->addItem(QStringLiteral("38400"), QSerialPort::Baud38400);
-    ui->baudBox->addItem(QStringLiteral("57600"), QSerialPort::Baud57600);
-    ui->baudBox->addItem(QStringLiteral("115200"), QSerialPort::Baud115200);
-    ui->baudBox->addItem(QStringLiteral("256000"), QSerialPort::Baud256000);
-    ui->baudBox->addItem(QStringLiteral("460800"), QSerialPort::Baud460800);
+    ui->baudBox->addItem(QStringLiteral("1200"), 1200);
+    ui->baudBox->addItem(QStringLiteral("2400"), 2400);
+    ui->baudBox->addItem(QStringLiteral("4800"), 4800);
+    ui->baudBox->addItem(QStringLiteral("9600"), 9600);
+    ui->baudBox->addItem(QStringLiteral("19200"), 19200);
+    ui->baudBox->addItem(QStringLiteral("38400"), 38400);
+    ui->baudBox->addItem(QStringLiteral("57600"), 57600);
+    ui->baudBox->addItem(QStringLiteral("115200"), 115200);
     ui->baudBox->setCurrentIndex(7); // Default 115200
 
     ui->filePathText->setDisabled(true);
@@ -35,6 +33,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     filePath = "";
     testFilePath = "";
+    spiffsFilePath = "";
 
     connect(ui->reloadBtn, &QPushButton::clicked,
             this, &MainWindow::loadPorts);
@@ -42,8 +41,10 @@ MainWindow::MainWindow(QWidget *parent) :
             this, &MainWindow::browseFile);
     connect(ui->browseTestBtn, &QPushButton::clicked,
             this, &MainWindow::browseTestFile);
+    connect(ui->browseSpiffsButton, &QPushButton::clicked,
+            this, &MainWindow::browseSpiffsFile);
     connect(ui->uploadBtn, &QPushButton::clicked,
-            this, &MainWindow::doUpload);
+            this, &MainWindow::doUpload); 
     connect(ui->testBtn, &QPushButton::clicked,
             this, &MainWindow::doTest);
 
@@ -80,6 +81,13 @@ MainWindow::MainWindow(QWidget *parent) :
         filePath = settings.value("settings/file").toString();
         ui->filePathText->setText(filePath);
     }
+
+    if(settings.contains("settings/spiffsfile"))
+    {
+        spiffsFilePath = settings.value("settings/spiffsfile").toString();
+        ui->spiffsFilePathText->setText(spiffsFilePath);
+    }
+
 
     if(settings.contains("settings/testFile"))
     {
@@ -130,6 +138,18 @@ void MainWindow::browseFile()
     }
 }
 
+void MainWindow::browseSpiffsFile()
+{
+    QSettings settings;
+    const QString fileName = QFileDialog::getOpenFileName(this);
+    if (!fileName.isEmpty())
+    {
+        spiffsFilePath = fileName;
+        ui->spiffsFilePathText->setText(spiffsFilePath);
+        settings.setValue("settings/spiffsfile", spiffsFilePath);
+    }
+}
+
 void MainWindow::browseTestFile()
 {
     QSettings settings;
@@ -148,9 +168,24 @@ void MainWindow::doUpload()
     ui->outputText->clear();
     ui->outputText->appendPlainText("Uploading...\n");
     QString appPath = QCoreApplication::applicationDirPath();
+
+#ifdef Q_OS_MACOS
     QString program = appPath + "/tool-esptool/esptool";
+#else
+    QString program = appPath + "/tool-esptool/esptool.exe";
+#endif
     QStringList arguments;
-    arguments << "-vv" << "-cd" << "ck" << "-cb" << ui->baudBox->currentText() << "-cp" << ui->portBox->currentData().toString() << "-cf" << filePath;
+
+    // TODO: need to change based on updated esptool parameters
+    //arguments << "-vv" << "-cd" << "ck" << "-cb" << ui->baudBox->currentText() << "-cp" << ui->portBox->currentData().toString() << "-cf" << filePath;
+
+    // Working command from command line
+    //"python /Users/jpswensen/Library/Arduino15/packages/esp8266/hardware/esp8266/2.6.1/tools/esptool/esptool.py --chip esp8266 --port /dev/cu.usbserial-1410 --baud 1000000 write_flash 0x000000 /Users/jpswensen/Documents/Arduino/build/AggieAIoT.ino.bin 0x200000 /Users/jpswensen/Documents/Arduino/build/AggieAIoT.spiffs.bin";
+    arguments << "--chip" << "esp8266"
+              << "--port" << ui->portBox->currentData().toString()
+              << "--baud" << "1000000"
+              << "write_flash" << "0x000000" << filePath
+              << "0x200000" << spiffsFilePath;
 
     startProcess(program, arguments);
 }
@@ -225,7 +260,8 @@ void MainWindow::startProcess(QString program, QStringList arguments, bool isTes
 
     connect(process, static_cast<void(QProcess::*)(QProcess::ProcessError)>(&QProcess::errorOccurred), this, [=](QProcess::ProcessError error)
     {
-        ui->outputText->appendPlainText( QString("An error occurred: ") + error );
+        ui->outputText->appendPlainText( QString("An error occurred: ") + error );        
+
         setInputsDisabled(false);
     });
 

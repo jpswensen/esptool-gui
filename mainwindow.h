@@ -22,6 +22,7 @@ private slots:
     void loadPorts();
     void browseFile();
     void browseTestFile();
+    void browseSpiffsFile();
     void doUpload();
     void doGetMac();
     void doTest();
@@ -41,6 +42,7 @@ private:
     QProcess *process;
     QString filePath;
     QString testFilePath;
+    QString spiffsFilePath;
 };
 
 #endif // MAINWINDOW_H
